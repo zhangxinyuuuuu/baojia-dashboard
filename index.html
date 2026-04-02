@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>报价单分析 · 03/23-03/29</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+  .header { background: linear-gradient(135deg, #0f3460 0%, #16213e 100%); padding: 24px 48px 20px; color: white; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+  .header .subtitle { margin-top: 6px; font-size: 12px; opacity: 0.7; }
+  .header-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .week-selector { display: flex; align-items: center; gap: 10px; }
+  .week-selector label { font-size: 13px; opacity: 0.85; white-space: nowrap; }
+  .week-select { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white;
+                  border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; outline: none; min-width: 200px; }
+  .week-select option { background: #1e293b; color: white; }
+  .scope-tags { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .scope-tag { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 3px 12px; font-size: 11px; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px 32px 48px; }
+  /* ── KPI 区域 ── */
+  .kpi-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  /* 概览卡（左侧大卡） */
+  .kpi-overview { background: white; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 5px rgba(0,0,0,0.07);
+                   border-left: 5px solid #6366f1; display: flex; flex-direction: column; justify-content: space-between; }
+  .kpi-overview-title { font-size: 12px; font-weight: 600; color: #6b7280; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .kpi-overview-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+  .ov-item { }
+  .ov-label { font-size: 11px; color: #9ca3af; margin-bottom: 2px; }
+  .ov-val { font-size: 20px; font-weight: 800; color: #1e293b; line-height: 1.1; }
+  .ov-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  /* 北极星卡（企微发送率） */
+  .kpi-star { border-radius: 12px; padding: 20px 22px; box-shadow: 0 2px 12px rgba(59,130,246,0.18);
+               background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 60%, #60a5fa 100%);
+               color: white; display: flex; flex-direction: column; gap: 8px; position: relative; overflow: hidden; }
+  .kpi-star::before { content:'★'; position:absolute; right:-6px; top:-10px; font-size:72px; opacity:0.08; line-height:1; }
+  .kpi-star-label { font-size: 12px; font-weight: 600; opacity: 0.85; display:flex; align-items:center; gap:6px; }
+  .kpi-star-value { font-size: 38px; font-weight: 900; line-height: 1; letter-spacing:-1px; }
+  .kpi-star-badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+  .kpi-star-progress { margin-top: 4px; }
+  .kpi-star-prog-label { font-size: 11px; opacity: 0.8; margin-bottom: 4px; }
+  .kpi-star-prog-bar { background: rgba(255,255,255,0.25); border-radius: 6px; height: 7px; overflow:hidden; }
+  .kpi-star-prog-fill { height:100%; border-radius:6px; background: rgba(255,255,255,0.9); transition: width .6s ease; }
+  /* 普通指标卡 */
+  .kpi-metric { background: white; border-radius: 12px; padding: 20px 22px; box-shadow: 0 1px 5px rgba(0,0,0,0.07);
+                 border-top: 4px solid transparent; display: flex; flex-direction: column; gap: 6px; }
+  .kpi-metric.view { border-top-color: #8b5cf6; }
+  .kpi-metric.dl   { border-top-color: #06b6d4; }
+  .kpi-metric-label { font-size: 12px; color: #6b7280; font-weight: 600; }
+  .kpi-metric-value { font-size: 32px; font-weight: 900; color: #111827; line-height: 1; }
+  .kpi-metric-sub { font-size: 11px; color: #9ca3af; }
+  .kpi-metric-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .section { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); }
+  .section-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: #3b82f6; flex-shrink: 0; }
+  .chart-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .chart-box { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); }
+  .chart-title { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 10px; }
+  .tab-header { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 2px solid #e5e7eb; }
+  .tab-btn { padding: 7px 16px; font-size: 13px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; border-radius: 4px 4px 0 0; transition: all .2s; background: none; border-left: none; border-right: none; border-top: none; }
+  .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; background: #eff6ff; }
+  .tab-pane { display: none; } .tab-pane.active { display: block; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: #f8fafc; }
+  th { padding: 9px 11px; text-align: left; font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb; white-space: nowrap; font-size: 12px; }
+  td { padding: 8px 11px; border-bottom: 1px solid #f3f4f6; color: #4b5563; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f9fafb; }
+  .val-blue { font-weight: 700; color: #1d4ed8; } .val-green { font-weight: 700; color: #059669; } .val-purple { font-weight: 700; color: #7c3aed; }
+  .rate-cell { display: flex; align-items: center; gap: 8px; min-width: 110px; }
+  .bar-bg { width: 60px; height: 7px; background: #e5e7eb; border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+  .bar-fill.send { background: linear-gradient(90deg,#10b981,#3b82f6); }
+  .bar-fill.view { background: linear-gradient(90deg,#f59e0b,#ec4899); }
+  .bar-fill.dl   { background: linear-gradient(90deg,#06b6d4,#8b5cf6); }
+  .bar-pct { font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .tag-h { background: #dcfce7; color: #16a34a; } .tag-m { background: #fef9c3; color: #ca8a04; } .tag-l { background: #fee2e2; color: #dc2626; }
+  .row-r4 td { background: #f0f9ff; font-weight: 700; }
+  .row-r4 td:first-child { color: #0f3460; font-size: 13px; }
+  .row-r5 td:first-child { padding-left: 24px; color: #6b7280; }
+  .row-total td { background: #f0fdf4; font-weight: 700; border-top: 2px solid #d1fae5; }
+  /* 折叠口径 */
+  .formula-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 14px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 16px; width: fit-content; font-size: 12px; color: #6b7280; user-select: none; }
+  .formula-toggle:hover { background: #f1f5f9; }
+  .formula-panel { background: #f8fafc; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; border: 1px solid #e5e7eb; display: none; }
+  .formula-panel.open { display: block; }
+  .formula-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .formula-item { font-size: 12px; color: #6b7280; padding: 6px 10px; background: white; border-radius: 6px; border: 1px solid #e5e7eb; }
+  .formula-item b { color: #1d4ed8; }
+  /* 洞察 */
+  .insight-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+  .insight-card { border-radius: 10px; padding: 14px 16px; }
+  .insight-card.green { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .insight-card.yellow { background: #fefce8; border: 1px solid #fde68a; }
+  .insight-card.red { background: #fef2f2; border: 1px solid #fecaca; }
+  .insight-card.blue { background: #eff6ff; border: 1px solid #bfdbfe; }
+  .insight-card.purple { background: #faf5ff; border: 1px solid #ddd6fe; }
+  .insight-card.gray { background: #f9fafb; border: 1px solid #e5e7eb; }
+  .insight-emoji { font-size: 20px; margin-bottom: 6px; }
+  .insight-title { font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 4px; }
+  .insight-body { font-size: 12px; color: #6b7280; line-height: 1.6; }
+  .insight-body b { color: #111827; }
+  .note { font-size: 12px; color: #9ca3af; margin-top: 10px; padding: 7px 12px; background: #f9fafb; border-radius: 6px; border-left: 3px solid #e5e7eb; }
+  /* 历史对比 */
+  .history-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .badge-up { background: #dcfce7; color: #16a34a; }
+  .badge-down { background: #fee2e2; color: #dc2626; }
+  .badge-flat { background: #f3f4f6; color: #6b7280; }
+  @media(max-width:900px){
+    .kpi-row { grid-template-columns: repeat(2,1fr); }
+    .chart-2col { grid-template-columns: 1fr; }
+    .formula-list { grid-template-columns: 1fr; }
+    .insight-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-row">
+    <div>
+      <h1>📊 报价单企微运营分析看板</h1>
+      <div class="subtitle">统计口径：状态 = 审核通过 + 已采用 · 创建团队：中小客户销售 &amp; 大客户销售</div>
+    </div>
+    <div class="week-selector">
+      <label>📅 查看周次：</label>
+      <select class="week-select" id="weekSelect" onchange="switchWeek(this.value)">
+        <option value="03/23-03/29" selected>03/23-03/29 (2026.03.23 – 2026.03.29)</option>
+<option value="03/17-03/22" >03/17-03/22 (2026.03.17 – 2026.03.22)</option>
+      </select>
+    </div>
+  </div>
+  <div class="scope-tags">
+    <span class="scope-tag" id="genTimeTag">🕐 生成时间：2026-04-02 14:16</span>
+  </div>
+</div>
+<div class="container">
+  <!-- 折叠式口径 -->
+  <div class="formula-toggle" onclick="toggleFormula(this)">
+    <span>📐</span><span>指标计算口径</span><span id="formulaArrow">▼</span>
+  </div>
+  <div class="formula-panel" id="formulaPanel">
+    <div class="formula-list">
+      <div class="formula-item">📋 <b>创建报价单数</b>：状态=审核通过 or 已采用 的报价单数</div>
+      <div class="formula-item">👥 <b>报价客户数</b>：按「报价客户ID」去重计数</div>
+      <div class="formula-item">📤 <b>企微发送数</b>：「企微发送用户ID」非空的报价单数</div>
+      <div class="formula-item">📈 <b>发送率</b> = 企微发送数 ÷ 报价客户数（去重）</div>
+      <div class="formula-item">👀 <b>浏览人数</b>：「用户首次浏览日期」非空的报价单数</div>
+      <div class="formula-item">🔍 <b>浏览率</b> = 浏览人数 ÷ 企微发送数</div>
+      <div class="formula-item">⬇️ <b>下载人数</b>：「用户首次下载日期」非空的报价单数</div>
+      <div class="formula-item">📥 <b>下载率</b> = 下载人数 ÷ 浏览人数</div>
+      <div class="formula-item">📅 <b>按天统计</b>：仅含工作日，排除周末</div>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-row" id="kpiRow">
+    <!-- 左侧概览卡 -->
+    <div class="kpi-overview" id="kpiOverview">
+      <div class="kpi-overview-title">📋 本周整体概览</div>
+      <div class="kpi-overview-stats" id="kpiOverviewStats"></div>
+    </div>
+    <!-- 北极星：发送率 -->
+    <div class="kpi-star" id="kpiStar"></div>
+    <!-- 浏览率 -->
+    <div class="kpi-metric view" id="kpiView"></div>
+    <!-- 下载率 -->
+    <div class="kpi-metric dl" id="kpiDl"></div>
+  </div>
+
+  <!-- 图表区 -->
+  <div class="chart-2col">
+    <div class="chart-box"><div class="chart-title">各大区核心指标（创建报价单数 / 报价客户数 / 企微发送数）</div><div id="chart_r4_bar" style="height:300px;"></div></div>
+    <div class="chart-box"><div class="chart-title">SME 发送率 &amp; 浏览率</div><div id="chart_r4_rate" style="height:300px;"></div></div>
+  </div>
+  <div class="chart-2col">
+    <div class="chart-box"><div class="chart-title">每日发送率 &amp; 浏览率趋势</div><div id="chart_daily_rate" style="height:270px;"></div></div>
+    <div class="chart-box section-placeholder" style="background:transparent;box-shadow:none;"></div>
+  </div>
+
+  <!-- 各区多周发送率趋势 -->
+  <div class="chart-box section" style="margin-bottom:16px;">
+    <div class="section-title"><span class="dot"></span>SME 多周趋势</div>
+    <div id="chart_trend" style="height:300px;"></div>
+  </div>
+
+  <!-- 数据洞察 -->
+  <div class="section" id="insightSection">
+    <div class="section-title"><span class="dot" style="background:#f59e0b"></span>数据洞察</div>
+    <div class="insight-grid" id="insightGrid"></div>
+  </div>
+
+  <!-- 明细表 -->
+  <div class="section">
+    <div class="section-title"><span class="dot"></span>明细数据表</div>
+    <div class="tab-header">
+      <button class="tab-btn active" onclick="switchTab(this,'tab_r4')">按大区（R4）</button>
+      <button class="tab-btn" onclick="switchTab(this,'tab_daily')">按天</button>
+    </div>
+    <div class="tab-pane active" id="tab_r4">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>销售大区（R4）</th><th>销售团队（R5）</th>
+            <th>创建报价单数</th><th>报价客户数<br><span style="font-weight:400;color:#9ca3af">（去重）</span></th>
+            <th>企微发送数</th><th>发送率</th>
+            <th>浏览人数</th><th>浏览率</th>
+            <th>下载人数</th><th>下载率</th><th>评级</th>
+          </tr></thead>
+          <tbody id="tbody_r4"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="tab-pane" id="tab_daily">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>日期</th>
+            <th>创建报价单数</th><th>报价客户数<br><span style="font-weight:400;color:#9ca3af">（去重）</span></th>
+            <th>企微发送数</th><th>发送率</th>
+            <th>浏览人数</th><th>浏览率</th>
+            <th>下载人数</th><th>下载率</th>
+          </tr></thead>
+          <tbody id="tbody_daily"></tbody>
+        </table>
+      </div>
+      <div class="note">📅 展示全部日期（含周末）。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 所有历史数据
+const allHistory = [{"weekKey": "03/17-03/22", "dateRange": "2026.03.17 – 2026.03.22", "genTime": "2026-04-02 12:14", "total": {"created": 2224, "customers": 2049, "sent": 260, "viewed": 104, "downloaded": 14, "sendRate": 12.7, "viewRate": 40.0, "dlRate": 13.5}, "wTotal": {"created": 2210, "customers": 2040, "sent": 258, "viewed": 104, "downloaded": 14, "sendRate": 12.6, "viewRate": 40.3, "dlRate": 13.5}, "r4Data": [{"created": 899, "customers": 845, "sent": 203, "viewed": 77, "downloaded": 8, "sendRate": 24.0, "viewRate": 37.9, "dlRate": 10.4, "r4": "中小客户销售一区", "r5": [{"created": 273, "customers": 255, "sent": 58, "viewed": 21, "downloaded": 2, "sendRate": 22.7, "viewRate": 36.2, "dlRate": 9.5, "r5": "深圳SME"}, {"created": 227, "customers": 213, "sent": 39, "viewed": 15, "downloaded": 3, "sendRate": 18.3, "viewRate": 38.5, "dlRate": 20.0, "r5": "北京SME"}, {"created": 133, "customers": 128, "sent": 48, "viewed": 16, "downloaded": 2, "sendRate": 37.5, "viewRate": 33.3, "dlRate": 12.5, "r5": "武汉SME"}, {"created": 110, "customers": 101, "sent": 16, "viewed": 6, "downloaded": 0, "sendRate": 15.8, "viewRate": 37.5, "dlRate": 0.0, "r5": "广州SME一组"}, {"created": 108, "customers": 104, "sent": 37, "viewed": 17, "downloaded": 1, "sendRate": 35.6, "viewRate": 45.9, "dlRate": 5.9, "r5": "广州SME二组"}, {"created": 48, "customers": 44, "sent": 5, "viewed": 2, "downloaded": 0, "sendRate": 11.4, "viewRate": 40.0, "dlRate": 0.0, "r5": "天津SME"}]}, {"created": 826, "customers": 763, "sent": 23, "viewed": 11, "downloaded": 2, "sendRate": 3.0, "viewRate": 47.8, "dlRate": 18.2, "r4": "中小客户销售二区", "r5": [{"created": 486, "customers": 458, "sent": 9, "viewed": 2, "downloaded": 1, "sendRate": 2.0, "viewRate": 22.2, "dlRate": 50.0, "r5": "上海SME"}, {"created": 119, "customers": 101, "sent": 5, "viewed": 3, "downloaded": 0, "sendRate": 5.0, "viewRate": 60.0, "dlRate": 0.0, "r5": "苏州SME一组"}, {"created": 104, "customers": 97, "sent": 1, "viewed": 1, "downloaded": 0, "sendRate": 1.0, "viewRate": 100.0, "dlRate": 0.0, "r5": "杭州SME"}, {"created": 61, "customers": 55, "sent": 3, "viewed": 2, "downloaded": 1, "sendRate": 5.5, "viewRate": 66.7, "dlRate": 50.0, "r5": "苏州SME二组"}, {"created": 56, "customers": 52, "sent": 5, "viewed": 3, "downloaded": 0, "sendRate": 9.6, "viewRate": 60.0, "dlRate": 0.0, "r5": "南京SME"}]}, {"created": 204, "customers": 188, "sent": 27, "viewed": 12, "downloaded": 3, "sendRate": 14.4, "viewRate": 44.4, "dlRate": 25.0, "r4": "中小客户销售三区", "r5": [{"created": 156, "customers": 145, "sent": 27, "viewed": 12, "downloaded": 3, "sendRate": 18.6, "viewRate": 44.4, "dlRate": 25.0, "r5": "成都SME一组"}, {"created": 48, "customers": 43, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "成都SME二组"}]}, {"created": 111, "customers": 90, "sent": 2, "viewed": 1, "downloaded": 1, "sendRate": 2.2, "viewRate": 50.0, "dlRate": 100.0, "r4": "大客户销售一区", "r5": [{"created": 39, "customers": 28, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "深圳KA"}, {"created": 37, "customers": 31, "sent": 1, "viewed": 0, "downloaded": 0, "sendRate": 3.2, "viewRate": 0.0, "dlRate": null, "r5": "广州KA"}, {"created": 15, "customers": 14, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "中区KA"}, {"created": 15, "customers": 13, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "浙赣KA"}, {"created": 5, "customers": 4, "sent": 1, "viewed": 1, "downloaded": 1, "sendRate": 25.0, "viewRate": 100.0, "dlRate": 100.0, "r5": "福厦KA"}]}, {"created": 81, "customers": 74, "sent": 2, "viewed": 2, "downloaded": 0, "sendRate": 2.7, "viewRate": 100.0, "dlRate": 0.0, "r4": "大客户销售二区", "r5": [{"created": 42, "customers": 39, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "北京KA"}, {"created": 39, "customers": 35, "sent": 2, "viewed": 2, "downloaded": 0, "sendRate": 5.7, "viewRate": 100.0, "dlRate": 0.0, "r5": "北区KA"}]}, {"created": 73, "customers": 62, "sent": 2, "viewed": 0, "downloaded": 0, "sendRate": 3.2, "viewRate": 0.0, "dlRate": null, "r4": "大客户销售三区", "r5": [{"created": 52, "customers": 42, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "上海KA"}, {"created": 21, "customers": 20, "sent": 2, "viewed": 0, "downloaded": 0, "sendRate": 10.0, "viewRate": 0.0, "dlRate": null, "r5": "西区KA"}]}, {"created": 30, "customers": 27, "sent": 1, "viewed": 1, "downloaded": 0, "sendRate": 3.7, "viewRate": 100.0, "dlRate": 0.0, "r4": "大客户销售四区", "r5": [{"created": 30, "customers": 27, "sent": 1, "viewed": 1, "downloaded": 0, "sendRate": 3.7, "viewRate": 100.0, "dlRate": 0.0, "r5": "苏皖KA"}]}], "dailyData": [{"created": 528, "customers": 507, "sent": 71, "viewed": 23, "downloaded": 4, "sendRate": 14.0, "viewRate": 32.4, "dlRate": 17.4, "date": "03-17"}, {"created": 564, "customers": 531, "sent": 53, "viewed": 27, "downloaded": 3, "sendRate": 10.0, "viewRate": 50.9, "dlRate": 11.1, "date": "03-18"}, {"created": 604, "customers": 578, "sent": 71, "viewed": 29, "downloaded": 6, "sendRate": 12.3, "viewRate": 40.8, "dlRate": 20.7, "date": "03-19"}, {"created": 514, "customers": 486, "sent": 63, "viewed": 25, "downloaded": 1, "sendRate": 13.0, "viewRate": 39.7, "dlRate": 4.0, "date": "03-20"}]}, {"weekKey": "03/23-03/29", "dateRange": "2026.03.23 – 2026.03.29", "genTime": "2026-04-02 14:16", "total": {"created": 2263, "customers": 2052, "sent": 181, "viewed": 64, "downloaded": 12, "sendRate": 8.8, "viewRate": 35.4, "dlRate": 18.8}, "wTotal": {"created": 2251, "customers": 2041, "sent": 180, "viewed": 63, "downloaded": 12, "sendRate": 8.8, "viewRate": 35.0, "dlRate": 19.0}, "r4Data": [{"created": 917, "customers": 842, "sent": 162, "viewed": 58, "downloaded": 11, "sendRate": 19.2, "viewRate": 35.8, "dlRate": 19.0, "r4": "中小客户销售一区", "r5": [{"created": 276, "customers": 265, "sent": 42, "viewed": 10, "downloaded": 2, "sendRate": 15.8, "viewRate": 23.8, "dlRate": 20.0, "r5": "深圳SME"}, {"created": 200, "customers": 177, "sent": 29, "viewed": 17, "downloaded": 4, "sendRate": 16.4, "viewRate": 58.6, "dlRate": 23.5, "r5": "北京SME"}, {"created": 138, "customers": 132, "sent": 39, "viewed": 6, "downloaded": 1, "sendRate": 29.5, "viewRate": 15.4, "dlRate": 16.7, "r5": "武汉SME"}, {"created": 136, "customers": 120, "sent": 15, "viewed": 7, "downloaded": 0, "sendRate": 12.5, "viewRate": 46.7, "dlRate": 0.0, "r5": "广州SME一组"}, {"created": 112, "customers": 102, "sent": 32, "viewed": 16, "downloaded": 3, "sendRate": 31.4, "viewRate": 50.0, "dlRate": 18.8, "r5": "广州SME二组"}, {"created": 55, "customers": 46, "sent": 5, "viewed": 2, "downloaded": 1, "sendRate": 10.9, "viewRate": 40.0, "dlRate": 50.0, "r5": "天津SME"}]}, {"created": 828, "customers": 757, "sent": 12, "viewed": 4, "downloaded": 0, "sendRate": 1.6, "viewRate": 33.3, "dlRate": 0.0, "r4": "中小客户销售二区", "r5": [{"created": 380, "customers": 360, "sent": 2, "viewed": 1, "downloaded": 0, "sendRate": 0.6, "viewRate": 50.0, "dlRate": 0.0, "r5": "苏州SME一组"}, {"created": 198, "customers": 181, "sent": 4, "viewed": 2, "downloaded": 0, "sendRate": 2.2, "viewRate": 50.0, "dlRate": 0.0, "r5": "上海SME"}, {"created": 118, "customers": 107, "sent": 1, "viewed": 0, "downloaded": 0, "sendRate": 0.9, "viewRate": 0.0, "dlRate": null, "r5": "杭州SME"}, {"created": 71, "customers": 58, "sent": 4, "viewed": 0, "downloaded": 0, "sendRate": 6.9, "viewRate": 0.0, "dlRate": null, "r5": "南京SME"}, {"created": 61, "customers": 51, "sent": 1, "viewed": 1, "downloaded": 0, "sendRate": 2.0, "viewRate": 100.0, "dlRate": 0.0, "r5": "苏州SME二组"}]}, {"created": 213, "customers": 202, "sent": 5, "viewed": 1, "downloaded": 0, "sendRate": 2.5, "viewRate": 20.0, "dlRate": 0.0, "r4": "中小客户销售三区", "r5": [{"created": 146, "customers": 138, "sent": 4, "viewed": 1, "downloaded": 0, "sendRate": 2.9, "viewRate": 25.0, "dlRate": 0.0, "r5": "成都SME一组"}, {"created": 67, "customers": 64, "sent": 1, "viewed": 0, "downloaded": 0, "sendRate": 1.6, "viewRate": 0.0, "dlRate": null, "r5": "成都SME二组"}]}, {"created": 119, "customers": 100, "sent": 2, "viewed": 1, "downloaded": 1, "sendRate": 2.0, "viewRate": 50.0, "dlRate": 100.0, "r4": "大客户销售一区", "r5": [{"created": 51, "customers": 40, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "深圳KA"}, {"created": 30, "customers": 26, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "浙赣KA"}, {"created": 27, "customers": 25, "sent": 1, "viewed": 0, "downloaded": 0, "sendRate": 4.0, "viewRate": 0.0, "dlRate": null, "r5": "广州KA"}, {"created": 10, "customers": 8, "sent": 1, "viewed": 1, "downloaded": 1, "sendRate": 12.5, "viewRate": 100.0, "dlRate": 100.0, "r5": "中区KA"}, {"created": 1, "customers": 1, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "福厦KA"}]}, {"created": 82, "customers": 65, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r4": "大客户销售二区", "r5": [{"created": 55, "customers": 46, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "北京KA"}, {"created": 27, "customers": 19, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "北区KA"}]}, {"created": 81, "customers": 66, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r4": "大客户销售三区", "r5": [{"created": 60, "customers": 47, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "上海KA"}, {"created": 21, "customers": 19, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "西区KA"}]}, {"created": 23, "customers": 20, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r4": "大客户销售四区", "r5": [{"created": 23, "customers": 20, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "r5": "苏皖KA"}]}], "dailyData": [{"created": 444, "customers": 425, "sent": 42, "viewed": 13, "downloaded": 3, "sendRate": 9.9, "viewRate": 31.0, "dlRate": 23.1, "date": "03-23", "isWeekend": false}, {"created": 475, "customers": 442, "sent": 41, "viewed": 22, "downloaded": 4, "sendRate": 9.3, "viewRate": 53.7, "dlRate": 18.2, "date": "03-24", "isWeekend": false}, {"created": 508, "customers": 485, "sent": 36, "viewed": 9, "downloaded": 2, "sendRate": 7.4, "viewRate": 25.0, "dlRate": 22.2, "date": "03-25", "isWeekend": false}, {"created": 509, "customers": 480, "sent": 33, "viewed": 10, "downloaded": 2, "sendRate": 6.9, "viewRate": 30.3, "dlRate": 20.0, "date": "03-26", "isWeekend": false}, {"created": 315, "customers": 296, "sent": 28, "viewed": 9, "downloaded": 1, "sendRate": 9.5, "viewRate": 32.1, "dlRate": 11.1, "date": "03-27", "isWeekend": false}, {"created": 11, "customers": 11, "sent": 1, "viewed": 1, "downloaded": 0, "sendRate": 9.1, "viewRate": 100.0, "dlRate": 0.0, "date": "03-28", "isWeekend": true}, {"created": 1, "customers": 1, "sent": 0, "viewed": 0, "downloaded": 0, "sendRate": 0.0, "viewRate": null, "dlRate": null, "date": "03-29", "isWeekend": true}]}];
+
+// ============================================================
+// 工具函数
+// ============================================================
+function rateCell(val, cls, max) {
+  if (val === null || val === undefined || isNaN(val)) return '<span style="color:#d1d5db">—</span>';
+  const w = Math.min(val / max * 100, 100).toFixed(1);
+  return `<div class="rate-cell"><div class="bar-bg"><div class="bar-fill ${cls}" style="width:${w}%"></div></div><span class="bar-pct">${val}%</span></div>`;
+}
+function rateTag(v) {
+  if (v >= 15) return '<span class="tag tag-h">优秀</span>';
+  if (v >= 8)  return '<span class="tag tag-m">良好</span>';
+  return '<span class="tag tag-l">待提升</span>';
+}
+function pct(v) { return v !== null && v !== undefined ? v + '%' : '—'; }
+function na(v) { return v !== null && v !== undefined ? v : '—'; }
+
+// ============================================================
+// 图表实例（全局，供重绘用）
+// ============================================================
+const charts = {};
+function getOrInit(id) {
+  if (!charts[id]) charts[id] = echarts.init(document.getElementById(id));
+  return charts[id];
+}
+window.addEventListener('resize', () => Object.values(charts).forEach(c => c.resize()));
+
+// ============================================================
+// 渲染当前周
+// ============================================================
+function switchWeek(weekKey) {
+  const week = allHistory.find(w => w.weekKey === weekKey);
+  if (!week) return;
+  renderKPI(week);
+  renderChartR4Bar(week);
+  renderChartR4Rate(week);
+  renderChartDailyRate(week);
+  renderTableR4(week);
+  renderTableDaily(week);
+  renderInsight(week);
+}
+
+// ============================================================
+// KPI 卡片
+// ============================================================
+function renderKPI(week) {
+  const t = week.total;
+  const prev = getPrevWeek(week.weekKey);
+
+  // ── 左侧概览卡 ──
+  document.getElementById('kpiOverviewStats').innerHTML = `
+    <div class="ov-item">
+      <div class="ov-label">创建报价单数</div>
+      <div class="ov-val" style="color:#1d4ed8">${t.created.toLocaleString()}</div>
+      <div class="ov-sub">审核通过 + 已采用</div>
+    </div>
+    <div class="ov-item">
+      <div class="ov-label">报价客户数（去重）</div>
+      <div class="ov-val" style="color:#7c3aed">${t.customers.toLocaleString()}</div>
+      <div class="ov-sub">按报价客户ID去重</div>
+    </div>
+    <div class="ov-item">
+      <div class="ov-label">企微发送数</div>
+      <div class="ov-val" style="color:#059669">${t.sent.toLocaleString()}</div>
+      <div class="ov-sub">有效企微发送记录</div>
+    </div>
+    <div class="ov-item">
+      <div class="ov-label">数据日期范围</div>
+      <div class="ov-val" style="font-size:14px;color:#374151;margin-top:4px">${week.weekKey}</div>
+      <div class="ov-sub">${week.dateRange}</div>
+    </div>
+  `;
+
+  // ── 北极星：发送率 ──
+  const sr = t.sendRate;
+  const gap = +(100 - sr).toFixed(1);
+  const progPct = Math.min(sr, 100).toFixed(1);
+  const wowSend = prev ? +(sr - prev.sendRate).toFixed(1) : null;
+  document.getElementById('kpiStar').innerHTML = `
+    <div class="kpi-star-label">⭐ 企微发送率 <span style="font-size:10px;opacity:0.7;font-weight:400">北极星指标</span></div>
+    <div class="kpi-star-value">${sr}%</div>
+    <div class="kpi-star-badges">
+      ${wowSend !== null ? diffBadgeWhite(wowSend,'%') : ''}
+      <span style="background:rgba(255,255,255,0.18);border-radius:20px;padding:2px 10px;font-size:11px;opacity:0.9">
+        距目标 ${gap > 0 ? gap + '%' : '已达标 🎉'}
+      </span>
+    </div>
+    <div class="kpi-star-progress">
+      <div class="kpi-star-prog-label">目标进度（目标 100%）</div>
+      <div class="kpi-star-prog-bar"><div class="kpi-star-prog-fill" style="width:${progPct}%"></div></div>
+    </div>
+  `;
+
+  // ── 浏览率卡 ──
+  const vr = t.viewRate;
+  const wowView = (prev && prev.viewRate !== null && vr !== null) ? +(vr - prev.viewRate).toFixed(1) : null;
+  document.getElementById('kpiView').innerHTML = `
+    <div class="kpi-metric-label">👀 用户浏览率</div>
+    <div class="kpi-metric-value" style="color:#7c3aed">${pct(vr)}</div>
+    <div class="kpi-metric-sub">浏览人数 <b>${t.viewed}</b> 人 · 发送数 ${t.sent}</div>
+    <div class="kpi-metric-badges">${wowView !== null ? diffBadge(null,'',wowView,'%',true) : '<span style="font-size:11px;color:#d1d5db">暂无上周对比</span>'}</div>
+  `;
+
+  // ── 下载率卡 ──
+  const dr = t.dlRate;
+  const wowDl = (prev && prev.dlRate !== null && dr !== null) ? +(dr - prev.dlRate).toFixed(1) : null;
+  document.getElementById('kpiDl').innerHTML = `
+    <div class="kpi-metric-label">⬇️ 用户下载率</div>
+    <div class="kpi-metric-value" style="color:#0891b2">${pct(dr)}</div>
+    <div class="kpi-metric-sub">下载人数 <b>${t.downloaded}</b> 人 · 浏览人数 ${t.viewed}</div>
+    <div class="kpi-metric-badges">${wowDl !== null ? diffBadge(null,'',wowDl,'%',true) : '<span style="font-size:11px;color:#d1d5db">暂无上周对比</span>'}</div>
+  `;
+}
+
+function getPrevWeek(currentKey) {
+  const idx = allHistory.findIndex(w => w.weekKey === currentKey);
+  return idx > 0 ? allHistory[idx - 1].total : null;
+}
+
+// 从对象字段差值生成徽章
+function diffBadge(prev, field, curOrDiff, unit='', isDirect=false) {
+  let diff;
+  if (isDirect) {
+    diff = +curOrDiff;
+  } else {
+    if (!prev || prev[field] === null || prev[field] === undefined) return '';
+    diff = +(curOrDiff - prev[field]).toFixed(1);
+  }
+  if (diff === 0) return `<span class="history-badge badge-flat">持平</span>`;
+  const sign = diff > 0 ? '+' : '';
+  const cls  = diff > 0 ? 'badge-up' : 'badge-down';
+  const arrow = diff > 0 ? '↑' : '↓';
+  return `<span class="history-badge ${cls}">${arrow} ${sign}${diff}${unit}</span>`;
+}
+
+// 白色版徽章（用于深色背景）
+function diffBadgeWhite(diff, unit='') {
+  if (diff === 0) return `<span style="background:rgba(255,255,255,0.18);border-radius:20px;padding:2px 10px;font-size:11px">vs上周 持平</span>`;
+  const sign = diff > 0 ? '+' : '';
+  const emoji = diff > 0 ? '↑' : '↓';
+  const bg = diff > 0 ? 'rgba(255,255,255,0.22)' : 'rgba(255,100,100,0.35)';
+  return `<span style="background:${bg};border-radius:20px;padding:2px 10px;font-size:11px">vs上周 ${emoji} ${sign}${diff}${unit}</span>`;
+}
+
+// ============================================================
+// 图表：R4 柱图
+// ============================================================
+function renderChartR4Bar(week) {
+  const c = getOrInit('chart_r4_bar');
+  const names = week.r4Data.map(d => d.r4.replace('客户销售',''));
+  c.setOption({
+    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'} },
+    legend:{ data:['创建报价单数','报价客户数','企微发送数'], top:0, textStyle:{fontSize:11} },
+    grid:{ top:36, bottom:50, left:8, right:8, containLabel:true },
+    xAxis:{ type:'category', data:names, axisLabel:{fontSize:10,rotate:15} },
+    yAxis:{ type:'value' },
+    series:[
+      { name:'创建报价单数', type:'bar', data:week.r4Data.map(d=>d.created),   barMaxWidth:22, itemStyle:{color:'#93c5fd',borderRadius:[3,3,0,0]} },
+      { name:'报价客户数',   type:'bar', data:week.r4Data.map(d=>d.customers), barMaxWidth:22, itemStyle:{color:'#3b82f6',borderRadius:[3,3,0,0]} },
+      { name:'企微发送数',   type:'bar', data:week.r4Data.map(d=>d.sent),      barMaxWidth:22, itemStyle:{color:'#10b981',borderRadius:[3,3,0,0]} },
+    ]
+  }, true);
+}
+
+// ============================================================
+// 图表：R4 发送率/浏览率（只展示 SME 中小客户）
+// ============================================================
+function renderChartR4Rate(week) {
+  const c = getOrInit('chart_r4_rate');
+  const smeData = week.r4Data.filter(d => d.r4.includes('中小'));
+  const names = smeData.map(d => d.r4.replace('中小客户销售','中小'));
+  c.setOption({
+    tooltip:{ trigger:'axis' },
+    legend:{ data:['发送率(%)','浏览率(%)'], top:0, textStyle:{fontSize:11} },
+    grid:{ top:36, bottom:50, left:8, right:20, containLabel:true },
+    xAxis:{ type:'category', data:names, axisLabel:{fontSize:11,rotate:0} },
+    yAxis:{ type:'value', axisLabel:{formatter:'{value}%'}, max:110, interval:20 },
+    series:[
+      {
+        name:'发送率(%)', type:'bar', barMaxWidth:32,
+        data:smeData.map(d=>d.sendRate),
+        itemStyle:{ color: p => p.data>=15?'#10b981':p.data>=8?'#f59e0b':'#ef4444', borderRadius:[4,4,0,0] },
+        label:{ show:true, position:'top', formatter:'{c}%', fontSize:11 }
+      },
+      {
+        name:'浏览率(%)', type:'line', smooth:true,
+        data:smeData.map(d=>d.sent===0?null:d.viewRate),
+        symbol:'circle', symbolSize:8,
+        itemStyle:{color:'#8b5cf6'}, lineStyle:{width:2,type:'dashed'},
+        label:{show:true, formatter:p=>p.value!=null?p.value+'%':'', fontSize:11, color:'#7c3aed'}
+      }
+    ]
+  }, true);
+}
+
+// ============================================================
+// 图表：每日柱图
+// ============================================================
+function renderChartDailyBar(week) {
+  const c = getOrInit('chart_daily_bar');
+  c.setOption({
+    tooltip:{ trigger:'axis', axisPointer:{type:'shadow'} },
+    legend:{ data:['创建报价单数','报价客户数','企微发送数'], top:0, textStyle:{fontSize:11} },
+    grid:{ top:36, bottom:20, left:8, right:8, containLabel:true },
+    xAxis:{ type:'category', data:week.dailyData.map(d=>d.date) },
+    yAxis:{ type:'value' },
+    series:[
+      { name:'创建报价单数', type:'bar', data:week.dailyData.map(d=>d.created),   barMaxWidth:28, itemStyle:{color:'#93c5fd',borderRadius:[3,3,0,0]} },
+      { name:'报价客户数',   type:'bar', data:week.dailyData.map(d=>d.customers), barMaxWidth:28, itemStyle:{color:'#3b82f6',borderRadius:[3,3,0,0]} },
+      { name:'企微发送数',   type:'bar', data:week.dailyData.map(d=>d.sent),      barMaxWidth:28, itemStyle:{color:'#10b981',borderRadius:[3,3,0,0]} },
+    ]
+  }, true);
+}
+
+// ============================================================
+// 图表：每日折线
+// ============================================================
+function renderChartDailyRate(week) {
+  const c = getOrInit('chart_daily_rate');
+  c.setOption({
+    tooltip:{ trigger:'axis' },
+    legend:{ data:['发送率(%)','浏览率(%)','下载率(%)'], top:0, textStyle:{fontSize:11} },
+    grid:{ top:36, bottom:20, left:8, right:8, containLabel:true },
+    xAxis:{ type:'category', data:week.dailyData.map(d=>d.date) },
+    yAxis:{ type:'value', axisLabel:{formatter:'{value}%'}, max:100 },
+    series:[
+      { name:'发送率(%)', type:'line', smooth:true, data:week.dailyData.map(d=>d.sendRate),
+         symbol:'circle', symbolSize:7, itemStyle:{color:'#10b981'}, lineStyle:{width:2},
+         label:{show:true, formatter:'{c}%', fontSize:11},
+         areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(16,185,129,0.2)'},{offset:1,color:'rgba(16,185,129,0)'}]}}
+      },
+      { name:'浏览率(%)', type:'line', smooth:true, data:week.dailyData.map(d=>d.viewRate),
+         symbol:'circle', symbolSize:7, itemStyle:{color:'#8b5cf6'}, lineStyle:{width:2,type:'dashed'},
+         label:{show:true, formatter:'{c}%', fontSize:11}
+      },
+      { name:'下载率(%)', type:'line', smooth:true, data:week.dailyData.map(d=>d.dlRate),
+         symbol:'circle', symbolSize:7, itemStyle:{color:'#06b6d4'}, lineStyle:{width:2,type:'dotted'},
+         label:{show:true, formatter:'{c}%', fontSize:11}
+      }
+    ]
+  }, true);
+}
+
+// ============================================================
+// 图表：各区多周发送率趋势（SME 中小客户，全局渲染一次，不随周切换）
+// ============================================================
+function renderChartTrend() {
+  if (allHistory.length < 1) return;
+  const c = getOrInit('chart_trend');
+
+  // 只收集 SME 中小客户的 R4
+  const r4Set = new Set();
+  allHistory.forEach(w => w.r4Data.forEach(r => {
+    if (r.r4.includes('中小')) r4Set.add(r.r4);
+  }));
+  const r4List = Array.from(r4Set).sort();
+
+  const weekLabels = allHistory.map(w => w.weekKey);
+
+  const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899'];
+
+  const series = r4List.map((r4, i) => {
+    const data = allHistory.map(w => {
+      const found = w.r4Data.find(r => r.r4 === r4);
+      return found ? found.sendRate : null;
+    });
+    return {
+      name: r4.replace('中小客户销售','').replace('中小客户','') || r4,
+      type: 'line', smooth: true,
+      symbol: 'circle', symbolSize: 8,
+      data,
+      itemStyle: {color: COLORS[i % COLORS.length]},
+      lineStyle: {width: 2},
+      label: {show: true, formatter: p => p.value != null ? p.value + '%' : '', fontSize: 10}
+    };
+  });
+
+  c.setOption({
+    tooltip: { trigger:'axis', formatter: params => {
+      let s = `<b>${params[0].axisValue}</b><br>`;
+      params.forEach(p => { if (p.value != null) s += `${p.marker}${p.seriesName}: <b>${p.value}%</b><br>`; });
+      return s;
+    } },
+    legend: { data: r4List.map(r=>r.replace('中小客户销售','').replace('中小客户','') || r), top:0, textStyle:{fontSize:11} },
+    grid: { top:40, bottom:20, left:8, right:8, containLabel:true },
+    xAxis: { type:'category', data:weekLabels, axisLabel:{fontSize:11} },
+    yAxis: { type:'value', axisLabel:{formatter:'{value}%'}, max:110, interval:20 },
+    series
+  });
+}
+
+// ============================================================
+// 明细表：R4+R5（SME / KA 分组展示）
+// ============================================================
+function renderTableR4(week) {
+  const tbody = document.getElementById('tbody_r4');
+  let html = '';
+
+  const smeData = week.r4Data.filter(d => d.r4.includes('中小'));
+  const kaData  = week.r4Data.filter(d => d.r4.includes('大客户'));
+  const otherData = week.r4Data.filter(d => !d.r4.includes('中小') && !d.r4.includes('大客户'));
+
+  function renderGroup(label, groupData) {
+    if (!groupData.length) return '';
+    let s = `<tr class="row-group-header">
+      <td colspan="11" style="background:#e0e7ff;color:#3730a3;font-weight:700;font-size:12px;padding:6px 12px;letter-spacing:0.5px">${label}</td>
+    </tr>`;
+    groupData.forEach(d => {
+      const vr = d.sent>0 ? d.viewRate : null;
+      const dr = d.viewed>0 ? d.dlRate : null;
+      s += `<tr class="row-r4">
+        <td>${d.r4}</td><td></td>
+        <td><span class="val-blue">${d.created.toLocaleString()}</span></td>
+        <td><span class="val-purple">${d.customers.toLocaleString()}</span></td>
+        <td><span class="val-green">${d.sent}</span></td>
+        <td>${rateCell(d.sendRate,'send',40)}</td>
+        <td>${d.viewed}</td><td>${rateCell(vr,'view',100)}</td>
+        <td>${d.downloaded}</td><td>${rateCell(dr,'dl',100)}</td>
+        <td>${rateTag(d.sendRate)}</td>
+      </tr>`;
+      d.r5.forEach(r => {
+        const rvr = r.sent>0 ? r.viewRate : null;
+        const rdr = r.viewed>0 ? r.dlRate : null;
+        s += `<tr class="row-r5">
+          <td></td><td>${r.r5}</td>
+          <td>${r.created.toLocaleString()}</td>
+          <td>${r.customers.toLocaleString()}</td>
+          <td>${r.sent}</td>
+          <td>${rateCell(r.sendRate,'send',40)}</td>
+          <td>${r.viewed}</td><td>${rateCell(rvr,'view',100)}</td>
+          <td>${r.downloaded}</td><td>${rateCell(rdr,'dl',100)}</td>
+          <td></td>
+        </tr>`;
+      });
+    });
+    return s;
+  }
+
+  html += renderGroup('▸ 中小客户销售（SME）', smeData);
+  html += renderGroup('▸ 大客户销售（KA）', kaData);
+  if (otherData.length) html += renderGroup('▸ 其他', otherData);
+
+  const t = week.total;
+  html += `<tr class="row-total">
+    <td>合计</td><td></td>
+    <td><span class="val-blue">${t.created.toLocaleString()}</span></td>
+    <td><span class="val-purple">${t.customers.toLocaleString()}</span></td>
+    <td><span class="val-green">${t.sent}</span></td>
+    <td>${rateCell(t.sendRate,'send',40)}</td>
+    <td>${t.viewed}</td><td>${rateCell(t.viewRate,'view',100)}</td>
+    <td>${t.downloaded}</td><td>${rateCell(t.dlRate,'dl',100)}</td>
+    <td>—</td>
+  </tr>`;
+  tbody.innerHTML = html;
+}
+
+// ============================================================
+// 明细表：按天（含周末，周末行灰显）
+// ============================================================
+function renderTableDaily(week) {
+  const tbody = document.getElementById('tbody_daily');
+  let html = '';
+  week.dailyData.forEach(d => {
+    const vr = d.sent>0 ? d.viewRate : null;
+    const dr = d.viewed>0 ? d.dlRate : null;
+    const rowStyle = d.isWeekend ? ' style="opacity:0.55;background:#f9fafb"' : '';
+    const dateLabel = d.isWeekend ? `<b>${d.date}</b> <span style="font-size:10px;color:#9ca3af">休</span>` : `<b>${d.date}</b>`;
+    html += `<tr${rowStyle}>
+      <td>${dateLabel}</td>
+      <td><span class="val-blue">${d.created}</span></td>
+      <td><span class="val-purple">${d.customers}</span></td>
+      <td><span class="val-green">${d.sent}</span></td>
+      <td>${rateCell(d.sendRate,'send',40)}</td>
+      <td>${d.viewed}</td><td>${rateCell(vr,'view',100)}</td>
+      <td>${d.downloaded}</td><td>${rateCell(dr,'dl',100)}</td>
+    </tr>`;
+  });
+  const t = week.total;
+  html += `<tr class="row-total">
+    <td>全部合计</td>
+    <td><span class="val-blue">${t.created.toLocaleString()}</span></td>
+    <td><span class="val-purple">${t.customers.toLocaleString()}</span></td>
+    <td><span class="val-green">${t.sent}</span></td>
+    <td>${rateCell(t.sendRate,'send',40)}</td>
+    <td>${t.viewed}</td><td>${rateCell(t.viewRate,'view',100)}</td>
+    <td>${t.downloaded}</td><td>${rateCell(t.dlRate,'dl',100)}</td>
+  </tr>`;
+  tbody.innerHTML = html;
+}
+
+// ============================================================
+// 数据洞察
+// ============================================================
+function renderInsight(week) {
+  const t = week.total;
+  const prev = getPrevWeek(week.weekKey);
+  const r4 = week.r4Data;
+
+  // 最高 / 最低发送率大区（只看 SME 中小客户）
+  const smeR4  = r4.filter(d => d.r4.includes('中小'));
+  const sortBase = smeR4.length > 0 ? smeR4 : r4; // 降级兜底
+  const sorted = [...sortBase].sort((a,b) => b.sendRate - a.sendRate);
+  const topR4   = sorted[0];
+  const botR4   = sorted[sorted.length - 1];
+
+  // 转化漏斗
+  const funnelSend  = t.sendRate;
+  const funnelView  = t.viewRate  ?? 0;
+  const funnelDl    = t.dlRate    ?? 0;
+
+  // 环比变化
+  let wowSend = null, wowView = null;
+  if (prev) {
+    wowSend = +(t.sendRate - prev.sendRate).toFixed(1);
+    if (t.viewRate !== null && prev.viewRate !== null)
+      wowView = +(t.viewRate - prev.viewRate).toFixed(1);
+  }
+
+  const insights = [
+    {
+      cls: topR4.sendRate >= 15 ? 'green' : topR4.sendRate >= 8 ? 'yellow' : 'red',
+      emoji: '🏆',
+      title: '发送率最高大区',
+      body: `<b>${topR4.r4}</b> 本周发送率 <b>${topR4.sendRate}%</b>，` +
+            `共发送 <b>${topR4.sent}</b> 份，覆盖 <b>${topR4.customers}</b> 位报价客户。`
+    },
+    {
+      cls: botR4.sendRate < 8 ? 'red' : 'yellow',
+      emoji: '📌',
+      title: '发送率最低大区',
+      body: `<b>${botR4.r4}</b> 本周发送率仅 <b>${botR4.sendRate}%</b>，` +
+            `仍有较大提升空间，建议跟进企微发送执行情况。`
+    },
+    {
+      cls: wowSend === null ? 'gray' : wowSend > 0 ? 'green' : wowSend < 0 ? 'red' : 'gray',
+      emoji: wowSend === null ? '📊' : wowSend > 0 ? '📈' : wowSend < 0 ? '📉' : '➡️',
+      title: '发送率环比',
+      body: wowSend === null
+        ? '暂无上周数据，无法计算环比。'
+        : `整体发送率 <b>${t.sendRate}%</b>，较上周<b>${wowSend >= 0 ? '上升' : '下降'} ${Math.abs(wowSend)}%</b>。` +
+          (wowSend < 0 ? '发送率下滑，注意排查原因。' : '发送率持续改善，保持节奏。')
+    },
+    {
+      cls: funnelView >= 30 ? 'green' : funnelView >= 15 ? 'yellow' : 'red',
+      emoji: '👀',
+      title: '报价单浏览转化',
+      body: `已发送 <b>${t.sent}</b> 份，客户浏览 <b>${t.viewed}</b> 人，` +
+            `浏览率 <b>${pct(t.viewRate)}</b>。` +
+            (funnelView < 15 ? '浏览率偏低，可考虑优化触达时机或话术。' : '浏览转化情况较好。')
+    },
+    {
+      cls: funnelDl >= 15 ? 'green' : funnelDl >= 8 ? 'yellow' : 'blue',
+      emoji: '⬇️',
+      title: '报价单下载转化',
+      body: `浏览用户中 <b>${t.downloaded}</b> 人下载了报价单，` +
+            `下载率 <b>${pct(t.dlRate)}</b>。` +
+            (funnelDl < 8 ? '下载率偏低，可关注报价单内容吸引力。' : '下载转化正常。')
+    }
+  ];
+
+  document.getElementById('insightGrid').innerHTML = insights.map(ins => `
+    <div class="insight-card ${ins.cls}">
+      <div class="insight-emoji">${ins.emoji}</div>
+      <div class="insight-title">${ins.title}</div>
+      <div class="insight-body">${ins.body}</div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// Tab 切换
+// ============================================================
+function switchTab(btn, id) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(id).classList.add('active');
+}
+
+// ============================================================
+// 折叠口径
+// ============================================================
+function toggleFormula(el) {
+  const panel = document.getElementById('formulaPanel');
+  const arrow = document.getElementById('formulaArrow');
+  panel.classList.toggle('open');
+  arrow.textContent = panel.classList.contains('open') ? '▲' : '▼';
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+(function init() {
+  const latestKey = allHistory[allHistory.length - 1].weekKey;
+  document.getElementById('weekSelect').value = latestKey;
+  switchWeek(latestKey);
+  renderChartTrend();
+})();
+</script>
+</body>
+</html>
